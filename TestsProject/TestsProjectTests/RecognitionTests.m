@@ -13,6 +13,7 @@
 
 #import "G8RecognitionTestsHelper.h"
 #import "UIImage+G8Equal.h"
+#import "Defaults.h"
 
 SPEC_BEGIN(RecognitionTests)
 
@@ -56,6 +57,28 @@ describe(@"Simple image", ^{
 
         NSString *recognizedText = helper.tesseract.recognizedText;
         [[recognizedText should] containString:@"1234567890"];
+    });
+
+    it(@"Should recognize regardless of orientation", ^{
+        UIImage *image = [UIImage imageNamed:@"rotated_image_sample.jpg"];
+        UIImage *rotatedImage = [UIImage imageWithCGImage:image.CGImage
+                                                    scale:image.scale
+                                              orientation:UIImageOrientationRight];
+
+        NSAssert(image.imageOrientation != rotatedImage.imageOrientation, @"Error! Image has not been rotated");
+
+        G8Tesseract *tesseract = [[G8Tesseract alloc] initWithLanguage:kG8Languages];
+        tesseract.image = rotatedImage;
+        
+        [[theBlock(^{
+            [tesseract recognize];
+        }) shouldNot] raise];
+
+        NSString *recognizedText = tesseract.recognizedText;
+        [[recognizedText should] containString:@"1234567890"];
+
+        UIImage *thresholdedImage = tesseract.thresholdedImage;
+        [[theValue(thresholdedImage.imageOrientation) should] equal:theValue(UIImageOrientationUp)];
     });
 
     describe(@"Subimage", ^{
@@ -123,6 +146,20 @@ describe(@"Simple image", ^{
         [[theValue(CGRectGetHeight(block.boundingBox)) should] beInTheIntervalFrom:theValue(0.0f) to:theValue(1.0f)];
         [[theValue(block.confidence) should] beGreaterThanOrEqualTo:theValue(0.0f)];
         [[theValue(block.level) should] equal:theValue(G8PageIteratorLevelWord)];
+    });
+
+    it(@"Should clamp source resolution", ^{
+        [helper setupTesseract];
+
+        [[theValue(helper.tesseract.sourceResolution) should] equal:theValue(kG8DefaultResolution)];
+
+        helper.tesseract.sourceResolution = 50;
+        [[theValue(helper.tesseract.sourceResolution) should] beInTheIntervalFrom:theValue(kG8MinCredibleResolution)
+                                                                               to:theValue(kG8MaxCredibleResolution)];
+
+        helper.tesseract.sourceResolution = 3000;
+        [[theValue(helper.tesseract.sourceResolution) should] beInTheIntervalFrom:theValue(kG8MinCredibleResolution)
+                                                                               to:theValue(kG8MaxCredibleResolution)];
     });
 
     it(@"Should draw blocks on image", ^{
@@ -211,6 +248,16 @@ describe(@"Well scaned page", ^{
         [[theValue([onceThresholded g8_isEqualToImage:twiceThresholded]) should] beYes];
     });
 
+    it(@"Should not crash analyze layout", ^{
+        helper.pageSegmentationMode = G8PageSegmentationModeOSDOnly;
+
+        [helper recognizeImage];
+
+        [[theBlock(^{
+            [helper.tesseract deskewAngle];
+        }) shouldNot] raise];
+    });
+
     it(@"Should analyze layout", ^{
         helper.pageSegmentationMode = G8PageSegmentationModeAutoOSD;
 
@@ -274,7 +321,7 @@ describe(@"hOCR", ^{
     });
     
     it(@"Should return nil without prerecognition", ^{
-        G8Tesseract *tesseract = [[G8Tesseract alloc] init];
+        G8Tesseract *tesseract = [[G8Tesseract alloc] initWithLanguage:kG8Languages];
         
         NSString *hOCR = [tesseract recognizedHOCRForPageNumber:0];
         [[hOCR should] beNil];

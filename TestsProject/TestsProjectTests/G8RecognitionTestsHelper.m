@@ -50,8 +50,10 @@ static NSString *const kG8Languages = @"eng";
 
 - (void)setupTesseract
 {
-    self.tesseract.delegate = self;
-
+    if (self.tesseract == nil) {
+        self.tesseract = [[G8Tesseract alloc] initWithLanguage:kG8Languages];
+    }
+    
     self.tesseract.language = kG8Languages;
     self.tesseract.engineMode = self.engineMode;
     self.tesseract.pageSegmentationMode = self.pageSegmentationMode;
@@ -75,8 +77,10 @@ static NSString *const kG8Languages = @"eng";
 
 - (void)recognizeImage
 {
-    self.tesseract = [[G8Tesseract alloc] init];
+    self.tesseract = [[G8Tesseract alloc] initWithLanguage:kG8Languages];
     [self setupTesseract];
+    self.tesseract.delegate = self;
+
     [self setupImage];
 
     [self.tesseract recognize];
@@ -84,19 +88,26 @@ static NSString *const kG8Languages = @"eng";
 
 - (void)recognizeImageUsingOperation
 {
-    G8RecognitionOperation *operation = [[G8RecognitionOperation alloc] init];
+    G8RecognitionOperation *operation = [[G8RecognitionOperation alloc] initWithLanguage:kG8Languages];
+    operation.delegate = self;
     self.tesseract = operation.tesseract;
     [self setupTesseract];
-
+    
     [self setupImage];
-
-    __weak __typeof(self) weakSelf = self;
+    
+    __block BOOL recognitionCompleteBlockInvoked = NO;
+    __block BOOL progressCallbackBlockInvoked = NO;
+    // Set up callbacks to test that it's being called
+    operation.progressCallbackBlock = ^(G8Tesseract *tesseract){
+        progressCallbackBlockInvoked = YES;
+    };
 
     self.tesseract = nil;
+    __weak __typeof(self) weakSelf = self;
     operation.recognitionCompleteBlock = ^(G8Tesseract *recognizedTesseract) {
         __strong __typeof(weakSelf) strongSelf = weakSelf;
-
         strongSelf.tesseract = recognizedTesseract;
+        recognitionCompleteBlockInvoked = YES;
     };
 
     NSOperationQueue *queue = [[NSOperationQueue alloc] init];
@@ -107,21 +118,37 @@ static NSString *const kG8Languages = @"eng";
 
         return (BOOL)(strongSelf.tesseract == nil);
     }];
-
+    
     if (self.tesseract == nil) {
         [NSException raise:@"Tesseract stopped" format:@"Tesseract worked too long"];
     }
+    
+    NSAssert(recognitionCompleteBlockInvoked == YES, @"Error! recognitionCompleteBlock has not been invoked");
+    NSAssert(progressCallbackBlockInvoked == YES, @"Error! progressCallbackBlock has not been invoked");
 };
 
 - (UIImage *)thresholdedImageForImage:(UIImage *)sourceImage
 {
-    self.tesseract = [[G8Tesseract alloc] init];
+    self.tesseract = [[G8Tesseract alloc] initWithLanguage:kG8Languages];
     [self setupTesseract];
-
+    self.tesseract.delegate = self;
+    
     self.tesseract.image = [sourceImage g8_blackAndWhite];
 
     return self.tesseract.thresholdedImage;
 };
+
+#pragma mark - G8TesseractDelegate methods
+
+- (void)progressImageRecognitionForTesseract:(G8Tesseract *)tesseract
+{
+    
+}
+
+- (BOOL)shouldCancelImageRecognitionForTesseract:(G8Tesseract *)tesseract
+{
+    return NO;
+}
 
 - (UIImage *)preprocessedImageForTesseract:(G8Tesseract *)tesseract sourceImage:(UIImage *)sourceImage
 {

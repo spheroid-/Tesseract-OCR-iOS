@@ -11,20 +11,20 @@
 
 #import "TesseractOCR.h"
 
-@interface G8RecognitionOperation() <G8TesseractDelegate>
-
-@property (nonatomic, strong, readwrite) G8Tesseract *tesseract;
+@interface G8RecognitionOperation() <G8TesseractDelegate> {
+    G8Tesseract *_tesseract;
+}
 @property (nonatomic, assign, readwrite) CGFloat progress;
 
 @end
 
 @implementation G8RecognitionOperation
 
-- (id)init
+- (id) initWithLanguage:(NSString *)language
 {
     self = [super init];
     if (self != nil) {
-        _tesseract = [[G8Tesseract alloc] init];
+        _tesseract = [[G8Tesseract alloc] initWithLanguage:language];
         _tesseract.delegate = self;
 
         __weak __typeof(self) weakSelf = self;
@@ -49,6 +49,9 @@
 - (void)main
 {
     @autoreleasepool {
+        // Analyzing the layout must be performed before recognition
+        [self.tesseract analyseLayout];
+        
         [self.tesseract recognize];
     }
 }

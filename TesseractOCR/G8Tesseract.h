@@ -12,6 +12,21 @@
 #import "G8TesseractDelegate.h"
 
 /**
+ *  Default value of `sourceResolution` property.
+ */
+extern NSInteger const kG8DefaultResolution;
+
+/**
+ *  Minimum alowed value of `sourceResolution` property.
+ */
+extern NSInteger const kG8MinCredibleResolution;
+
+/**
+ *  Maximum alowed value of `sourceResolution` property.
+ */
+extern NSInteger const kG8MaxCredibleResolution;
+
+/**
  *  `G8Tesseract` encapsulates the Tesseract library and provides properties
  *  and methods for performing text recognition and analysis on a target image.
  */
@@ -95,7 +110,10 @@
 
 /**
  *  The resolution of the source image in pixels per inch so font size
- *  information can be calculated in results. Change it after setting image.
+ *  information can be calculated in results. It should be from 70 to
+ *  2400 or it will be clamped.
+ *
+ *  @default Default value is 72
  */
 @property (nonatomic, assign) NSInteger sourceResolution;
 
@@ -127,6 +145,15 @@
  *  @return The HTML-formatted string with hOCR markup.
  */
 - (NSString *)recognizedHOCRForPageNumber:(int)pageNumber;
+
+/**
+ *  Run Tesseract's page analysis on the target image.
+ *
+ *  @note You must have a file called "osd.traineddata" in the "tessdata"
+ *        folder to use this method. You can download this file from:
+ *        https://code.google.com/p/tesseract-ocr/downloads/list
+ */
+- (void)analyseLayout;
 
 /**
  *  The result of Tesseract's orientation analysis of the target image. See
@@ -225,6 +252,10 @@
  */
 @property (nonatomic, weak) id<G8TesseractDelegate> delegate;
 
+/// The default initializer should not be used since the language Tesseract
+/// uses needs to be explicit.
+- (instancetype)init __attribute__((unavailable("Use initWithLanguage:language instead")));
+
 /**
  *  Initialize Tesseract with the provided language.
  *
@@ -275,7 +306,49 @@
       configDictionary:(NSDictionary *)configDictionary
        configFileNames:(NSArray *)configFileNames
  cachesRelatedDataPath:(NSString *)cachesRelatedDataPath
-            engineMode:(G8OCREngineMode)engineMode NS_DESIGNATED_INITIALIZER;
+            engineMode:(G8OCREngineMode)engineMode;
+
+/**
+ *  Initialize Tesseract with the provided language and engine mode.
+ *
+ *  @param language                 The language to use in recognition. See
+ *                                  `language`.
+ *  @param configDictionary         A dictionary of config variables to set.
+ *  @param configFileNames          An array of file names containing key-value
+ *                                  config pairs. Config settings can be set at
+ *                                  initialization or run-time.  Furthermore, they
+ *                                  could be specified at the same time, in which
+ *                                  case Tesseract will get variables from every
+ *                                  config file as well as the dictionary.
+ *                                  The config files must exist in one of two
+ *                                  possible folders:  tessdata/tessconfigs or
+ *                                  tessdata/configs.
+ *  @param absoluteDataPath         If specified, Tesseract will be initialized to
+ *                                  use this path as the path prefix for the
+ *                                  tessdata folder. Consequently, you must have a
+ *                                  folder named "tessdata" in this path for
+ *                                  Tesseract to initialize properly (unless you
+ *                                  also set the `copyFilesFromResources` flag to
+ *                                  true, in which case the tessdata folder will
+ *                                  be created for you in this path). If nil, the
+ *                                  application bundle will be used instead as the
+ *                                  path prefix for the tessdata folder.
+ *  @param engineMode               The engine mode to use in recognition. See
+ *                                  `engineMode`.
+ *  @param copyFilesFromResources   Flag to determine if Tesseract should copy the
+ *                                  whole contents of the tessdata folder in the
+ *                                  application bundle to the
+ *                                  absoluteDataPath/tessdata directory
+ *
+ *
+ *  @return The initialized Tesseract object, or `nil` if there was an error.
+ */
+- (id)initWithLanguage:(NSString *)language
+      configDictionary:(NSDictionary *)configDictionary
+       configFileNames:(NSArray *)configFileNames
+      absoluteDataPath:(NSString *)absoluteDataPath
+            engineMode:(G8OCREngineMode)engineMode
+copyFilesFromResources:(BOOL)copyFilesFromResources NS_DESIGNATED_INITIALIZER;
 
 /**
  *  Set a Tesseract variable. See G8TesseractParameters.h for the available
